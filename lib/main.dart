@@ -1,12 +1,19 @@
+import 'dart:async';
+
+import 'package:chess_app/players_timers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chess_board/flutter_chess_board.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+final playerTimerProvider =
+    ChangeNotifierProvider(((_) => PlayerTimerNotifier()));
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: ChessApp()));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ChessApp extends StatelessWidget {
+  const ChessApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,19 +28,20 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatefulWidget {
+class MyHomePage extends ConsumerStatefulWidget {
   const MyHomePage({super.key, required this.title});
 
   final String title;
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  MyHomePageState createState() => MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class MyHomePageState extends ConsumerState<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     ChessBoardController chessBoardController = ChessBoardController();
+    final seconds = ref.watch(playerTimerProvider).seconds;
 
     return Scaffold(
       appBar: AppBar(
@@ -66,12 +74,20 @@ class _MyHomePageState extends State<MyHomePage> {
             ChessBoard(
               controller: chessBoardController,
             ),
-            Container(
-                margin: const EdgeInsets.only(top: 10),
-                child: const Text("Players info")),
+            const PlayerTimer(),
           ],
         ),
       ),
     );
+  }
+
+  String formatDuration(Duration d) {
+    String f(int n) {
+      return n.toString().padLeft(2, '0');
+    }
+
+    // We want to round up the remaining time to the nearest second
+    d += const Duration(microseconds: 999999);
+    return "${f(d.inMinutes)}:${f(d.inSeconds % 60)}";
   }
 }
