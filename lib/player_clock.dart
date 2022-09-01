@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:chess_app/widgets/timer_style.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chess_board/flutter_chess_board.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,7 +67,7 @@ class PlayerTimer extends ConsumerStatefulWidget {
 class PlayerTimerState extends ConsumerState<PlayerTimer> {
   @override
   Widget build(BuildContext context) {
-    // White pieces timer
+    // White pieces timer as 00:00 format
     final remainingWhite = ref
         .watch(whiteTimerProvider)
         .remainingDuration
@@ -79,7 +80,7 @@ class PlayerTimerState extends ConsumerState<PlayerTimer> {
     Future stopWhiteTimer() => Future.delayed(
         Duration.zero, () => ref.read(whiteTimerProvider).stopTimer());
 
-    // Black pieces timer
+    // Black pieces timer as 00:00 format
     final remainingBlack = ref
         .watch(blackTimerProvider)
         .remainingDuration
@@ -114,11 +115,34 @@ class PlayerTimerState extends ConsumerState<PlayerTimer> {
           stopWhiteTimer();
         }
 
-        return Column(children: [
-          Text(remainingWhite),
-          Text(remainingBlack),
-        ]);
+        return Column(children: []);
       }),
     );
+  }
+}
+
+class Clock {
+  final ChessBoardController chessBoardController;
+  final ChangeNotifierProvider<PlayerTimerNotifier> provider;
+  final WidgetRef ref;
+  final Color piecesColor;
+
+  Clock(this.ref,
+      {required this.provider,
+      required this.piecesColor,
+      required this.chessBoardController});
+
+  String get remaining =>
+      ref.watch(provider).remainingDuration.toString().substring(2, 7);
+
+  Future start() =>
+      Future.delayed(Duration.zero, () => ref.read(provider).startTimer());
+
+  Future stop() =>
+      Future.delayed(Duration.zero, () => ref.read(provider).stopTimer());
+
+  Widget show() {
+    return clockStyle(remaining, piecesColor,
+        chessBoardController: chessBoardController);
   }
 }
