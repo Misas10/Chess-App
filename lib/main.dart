@@ -1,4 +1,4 @@
-import 'package:chess_app/player_clock.dart';
+import 'player_clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chess_board/flutter_chess_board.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +7,12 @@ import 'package:chess_app/widgets/text_colors.dart';
 void main() {
   runApp(const ProviderScope(child: ChessApp()));
 }
+
+final whiteClockProvider = ChangeNotifierProvider(
+    (_) => PlayerTimerNotifier(totalDuration: const Duration(minutes: 5)));
+
+final blackClockProvider = ChangeNotifierProvider(
+    (_) => PlayerTimerNotifier(totalDuration: const Duration(minutes: 5)));
 
 class ChessApp extends StatelessWidget {
   const ChessApp({super.key});
@@ -35,29 +41,34 @@ class MyHomePage extends ConsumerStatefulWidget {
   MyHomePageState createState() => MyHomePageState();
 }
 
-final whiteClockProvider = ChangeNotifierProvider(
-    (_) => PlayerTimerNotifier(duration: const Duration(minutes: 5)));
-
-final blackClockProvider = ChangeNotifierProvider(
-    (_) => PlayerTimerNotifier(duration: const Duration(minutes: 5)));
-
-class MyHomePageState extends ConsumerState<MyHomePage> {
+class MyHomePageState extends ConsumerState<MyHomePage>
+    with TickerProviderStateMixin {
   late ChessBoardController chessBoardController;
+  // List of moves made during the game
+  List<String?> sanList = [''];
+  bool gameIsPaused = false;
+
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
     chessBoardController = ChessBoardController();
+    _animationController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 450));
   }
 
   @override
   void dispose() {
     super.dispose();
     chessBoardController.dispose();
+    _animationController.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    sanList = chessBoardController.getSan();
+
     // White Clock Provider
     Clock whiteClock = Clock(ref,
         provider: whiteClockProvider,
@@ -77,30 +88,32 @@ class MyHomePageState extends ConsumerState<MyHomePage> {
           widget.title,
           style: const TextStyle(color: labelText, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: appBg,
+        backgroundColor: appBarBg,
       ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Container(
-              margin: EdgeInsets.only(
-                  top: 10, bottom: MediaQuery.of(context).size.height / 32),
+              margin: const EdgeInsets.only(top: 10, left: 4, right: 4),
               // Creates a scrollable horizontal list
               child: SingleChildScrollView(
                 // Scrolls automatically when a new item is added
                 reverse: true,
                 scrollDirection: Axis.horizontal,
-                // Listens to a value and updates it with the builder
-                // In this case, values stored in the chessBoardController variable
-                child: ValueListenableBuilder<Chess>(
-                  valueListenable: chessBoardController,
-                  builder: ((context, value, child) => Text(chessBoardController
-                      .getSan()
-                      .fold(
-                          '',
-                          (previousValue, element) =>
-                              '$previousValue ${element ?? ''}'))),
+                // Shows a text of moves that were made
+                child: RichText(
+                  text: sanList.isNotEmpty
+                      ? TextSpan(children: <TextSpan>[
+                          TextSpan(
+                              text: sanList.take(sanList.length - 1).join(" "),
+                              style: const TextStyle(color: labelText)),
+                          TextSpan(
+                              text: '  ${sanList.last}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                        ])
+                      : const TextSpan(text: ""),
                 ),
               ),
             ),
@@ -113,22 +126,33 @@ class MyHomePageState extends ConsumerState<MyHomePage> {
 
   Widget _buildChessBoard(
       {required Clock whiteClock, required Clock blackClock}) {
-    if (chessBoardController.value.turn == Color.WHITE) {
-      whiteClock.start();
-      blackClock.stop();
+    bool enableUserMoves =
+        whiteClock.remaining != "00:00" || blackClock.remaining != "00:00";
+
+    if (!gameIsPaused) {
+      if (chessBoardController.value.turn == Color.WHITE) {
+        whiteClock.start();
+        blackClock.stop();
+      }
+
+      if (chessBoardController.value.turn == Color.BLACK) {
+        blackClock.start();
+        whiteClock.stop();
+      }
+    } else {
+      enableUserMoves = false;
     }
 
-    if (chessBoardController.value.turn == Color.BLACK) {
-      blackClock.start();
-      whiteClock.stop();
-    }
     return Column(
       children: [
         _infoRow("Black", blackClock.show()),
         ChessBoard(
+          size: MediaQuery.of(context).size.width,
           controller: chessBoardController,
+          enableUserMoves: enableUserMoves,
         ),
         _infoRow("White", whiteClock.show()),
+        _buildButtons(whiteClock: whiteClock, blackClock: blackClock),
       ],
     );
   }
@@ -137,7 +161,6 @@ class MyHomePageState extends ConsumerState<MyHomePage> {
     return Padding(
       padding: const EdgeInsets.all(8),
       child: Row(
-        // crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
@@ -153,5 +176,67 @@ class MyHomePageState extends ConsumerState<MyHomePage> {
         ],
       ),
     );
+  }
+
+  Widget _buildButtons({required Clock whiteClock, required Clock blackClock}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        resetButton(whiteClock, blackClock),
+        playPauseButton(whiteClock, blackClock),
+      ],
+    );
+  }
+
+  IconButton playPauseButton(Clock whiteClock, Clock blackClock) {
+    return IconButton(
+      onPressed: () {
+        if (!gameIsPaused) {
+          whiteClock.stop();
+          blackClock.stop();
+          debugPrint("Game is paused");
+        } else {
+          whiteClock.start();
+          blackClock.start();
+          debugPrint("Game as continued");
+        }
+        gameIsPaused = !gameIsPaused;
+
+        // Change the icon
+        gameIsPaused
+            // Pause icon
+            ? _animationController.forward()
+            // Play icon
+            : _animationController.reverse();
+      },
+      icon: AnimatedIcon(
+        icon: AnimatedIcons.play_pause,
+        progress: _animationController,
+      ),
+    );
+  }
+
+  IconButton resetButton(Clock whiteClock, Clock blackClock) {
+    return IconButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Restart game?"),
+              content: const Text("This will restart the game and the timer."),
+              actions: [
+                TextButton(onPressed: () {}, child: const Text("Cancel")),
+                TextButton(
+                    onPressed: () {
+                      whiteClock.reset();
+                      blackClock.reset();
+                      chessBoardController.resetBoard();
+                    },
+                    child: const Text("Yes"))
+              ],
+            ),
+          );
+        },
+        icon: const Icon(Icons.refresh));
   }
 }

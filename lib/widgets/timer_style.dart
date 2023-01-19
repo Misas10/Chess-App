@@ -26,14 +26,20 @@ Widget clockStyle(String timerText, chess_board.Color pieceColor,
     blackTextColor = blackClockActiveText;
   }
 
+  if (chessBoardController.game.game_over) {
+    whiteClockBg = clockInactiveBg;
+    blackClockBg = clockInactiveBg;
+
+    whiteTextColor = whiteClockInactiveText;
+    blackTextColor = whiteClockInactiveText;
+  }
+
   if (pieceColor == white) {
     return _clockBox(timerText,
         backgroundColor: whiteClockBg, textColor: whiteTextColor);
-    //
   } else if (pieceColor == black) {
     return _clockBox(timerText,
         backgroundColor: blackClockBg, textColor: blackTextColor);
-    //
   } else {
     throw ("Algo de errado não está certo");
   }
@@ -50,7 +56,6 @@ Container _clockBox(String timerText,
     child: Text(
       timerText,
       style: TextStyle(
-        // fontWeight: FontWeight.bold,
         fontFamily: "Roboto",
         fontSize: 24,
         color: textColor,

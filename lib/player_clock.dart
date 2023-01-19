@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class PlayerTimerNotifier extends ChangeNotifier {
   late Duration remainingDuration;
+  final Duration totalDuration;
   late String minutes;
   late String seconds;
 
@@ -17,8 +18,8 @@ class PlayerTimerNotifier extends ChangeNotifier {
   static String _twoDigits(int n) => n.toString().padLeft(2, '0');
 
   // Constructor method
-  PlayerTimerNotifier({required Duration duration}) {
-    remainingDuration = duration;
+  PlayerTimerNotifier({required this.totalDuration}) {
+    remainingDuration = totalDuration;
     minutes = _twoDigits(remainingDuration.inMinutes.remainder(60));
     seconds = _twoDigits(remainingDuration.inSeconds.remainder(60));
   }
@@ -47,77 +48,11 @@ class PlayerTimerNotifier extends ChangeNotifier {
     _timer?.cancel();
 
     isRunning = false;
+    notifyListeners();
   }
-}
 
-final whiteTimerProvider = ChangeNotifierProvider(
-    (_) => PlayerTimerNotifier(duration: const Duration(minutes: 3)));
-final blackTimerProvider = ChangeNotifierProvider(
-    (_) => PlayerTimerNotifier(duration: const Duration(minutes: 3)));
-
-class PlayerTimer extends ConsumerStatefulWidget {
-  final ChessBoardController chessBoardController;
-  const PlayerTimer({Key? key, required this.chessBoardController})
-      : super(key: key);
-
-  @override
-  PlayerTimerState createState() => PlayerTimerState();
-}
-
-class PlayerTimerState extends ConsumerState<PlayerTimer> {
-  @override
-  Widget build(BuildContext context) {
-    // White pieces timer as 00:00 format
-    final remainingWhite = ref
-        .watch(whiteTimerProvider)
-        .remainingDuration
-        .toString()
-        .substring(2, 7);
-
-    Future startWhiteTimer() => Future.delayed(
-        Duration.zero, () => ref.read(whiteTimerProvider).startTimer());
-
-    Future stopWhiteTimer() => Future.delayed(
-        Duration.zero, () => ref.read(whiteTimerProvider).stopTimer());
-
-    // Black pieces timer as 00:00 format
-    final remainingBlack = ref
-        .watch(blackTimerProvider)
-        .remainingDuration
-        .toString()
-        .substring(2, 7);
-
-    Future startBlackTimer() => Future.delayed(
-        Duration.zero, () => ref.read(blackTimerProvider).startTimer());
-
-    Future stopBlackTimer() => Future.delayed(
-        Duration.zero, () => ref.read(blackTimerProvider).stopTimer());
-
-    return ValueListenableBuilder<Chess>(
-      valueListenable: widget.chessBoardController,
-      builder: ((context, value, child) {
-        final bool isWhiteTurn = value.turn.name == "WHITE";
-
-        final bool isBlackTurn = value.turn.name == "BLACK";
-
-        if (isWhiteTurn) {
-          startWhiteTimer();
-          stopBlackTimer();
-        }
-
-        if (isBlackTurn) {
-          startBlackTimer();
-          stopWhiteTimer();
-        }
-
-        if (value.game_over) {
-          stopBlackTimer();
-          stopWhiteTimer();
-        }
-
-        return Column(children: []);
-      }),
-    );
+  void resetTimer() {
+    remainingDuration = totalDuration;
   }
 }
 
@@ -135,12 +70,15 @@ class Clock {
   String get remaining =>
       ref.watch(provider).remainingDuration.toString().substring(2, 7);
 
+  bool get isRunning => ref.watch(provider).isRunning;
+
   Future start() =>
       Future.delayed(Duration.zero, () => ref.read(provider).startTimer());
 
   Future stop() =>
       Future.delayed(Duration.zero, () => ref.read(provider).stopTimer());
 
+  reset() => ref.read(provider).resetTimer();
   Widget show() {
     return clockStyle(remaining, piecesColor,
         chessBoardController: chessBoardController);
